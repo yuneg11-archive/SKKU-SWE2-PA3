@@ -10,11 +10,11 @@
 #define MAXLINE   128
 #define MAXPIPE   32
 
+char *readLine(int fd, char *line, int limit);
 void eval(char *cmdline);
 int commandType(char *command);
 int parsePipe(char *buf, char **lines, char **pipe_in_file_p, char **pipe_out_file_p, int *pipe_out_file_mode_p);
 void parseLine(char *buf, char **argv);
-char *readLineAndStore(int fd);
 
 char *command_type[] = { NULL, "exit", "cd", "pwd", "rm", "mv", "cp", "cat", "head", "tail", NULL };
 void btin_exit(char *num);
@@ -27,6 +27,30 @@ int ext_cat(char *file);
 int ext_head(char *argv1, char *argv2, char *argv3);
 int ext_tail(char *argv1, char *argv2, char *argv3);
 
+char *readLine(int fd, char *line, int limit) {
+    char buf;
+    int rdbyte;
+    int cur = 0;
+
+    if((rdbyte = read(fd, &buf, sizeof(buf))) == 0)
+        return NULL;
+
+    for(cur = 0; cur < limit; cur++) {
+        if(rdbyte <= 0) break;
+        if(buf == '\0') break;
+        line[cur] = buf;
+        if(buf == '\n') {
+            cur++;
+            break;
+        }
+        rdbyte = read(fd, &buf, sizeof(buf));
+    }
+    
+    line[cur] = '\0';
+    //fprintf(stderr, "%2d |%s", strlen(line), line);
+    return line;
+}
+
 int main() {
     char cmdline[MAXLINE];
     int cmdlen;
@@ -35,9 +59,8 @@ int main() {
     signal(SIGTSTP, SIG_IGN);
 
     while (1) {
-	    printf("> ");                   
-	    fgets(cmdline, MAXLINE, stdin); 
-	    if (feof(stdin))
+	    write(STDOUT_FILENO, "> ", 2);                   
+	    if(readLine(STDIN_FILENO, cmdline, MAXLINE) == NULL)
 	        exit(0);
         cmdlen = strlen(cmdline);
         if(cmdline[cmdlen-1] == '\n')
@@ -211,24 +234,8 @@ void parseLine(char *buf, char **argv) {
     argv[argc] = NULL;
 }
 
-char *readLineAndStore(int fd) {
-    char buff[2048];
-    char *line;
-    int rdbyte;
-    int cur;
-
-    if((rdbyte = read(fd, buff, sizeof(buff))) > 0) {
-        for(cur = 0; cur < rdbyte && buff[cur] != '\n'; cur++);
-        line = (char*)malloc((cur+1) * sizeof(char));
-        strncpy(line, buff, cur);
-        line[cur] = '\0';
-        lseek(fd, cur-rdbyte+1, SEEK_CUR);
-        return line;
-    } else return NULL;
-}
-
 void btin_exit(char *num) {
-    fprintf(stderr, "exit\n");
+    write(STDERR_FILENO, "exit\n", 5);
     if(num != NULL)
         exit(atoi(num));
     else
@@ -241,8 +248,12 @@ int btin_cd(char *dir) {
 
 void ext_pwd() {
     char buf[255];
+    int buflen;
+
     getcwd(buf, 255);
-    printf("%s\n", buf);
+    buflen = strlen(buf);
+    buf[buflen] = '\n';
+    write(STDOUT_FILENO, buf, buflen+1);
 }
 
 int ext_rm(char *file) {
@@ -260,7 +271,7 @@ int ext_cp(char *file1, char *file2) {
     int rdbyte;
 
     if((srcfd = open(file1, O_RDONLY)) < 0) {
-        printf("swsh: No such file\n");
+        write(STDERR_FILENO, "swsh: No such file\n", 19);
         return -1;
     }
 
@@ -295,8 +306,7 @@ int ext_cat(char *file) {
 }
 
 int ext_head(char *argv1, char *argv2, char *argv3) {
-    FILE *file;
-    char buf[4096];
+    int fd;
     char *filename;
     int option = 10;
     char **lines;
@@ -328,9 +338,9 @@ int ext_head(char *argv1, char *argv2, char *argv3) {
     }
 
     if(strlen(filename) == 0)
-        file = stdin;
+        fd = STDIN_FILENO;
     else {
-        if((file = fopen(filename, "r")) == NULL) {
+        if((fd = open(filename, O_RDONLY)) < 0) {
             perror("Error: File doesn't exist");
             exit(1);
         }
@@ -339,24 +349,25 @@ int ext_head(char *argv1, char *argv2, char *argv3) {
     lines = (char**)malloc(option * sizeof(char*));
 
     for(i = 0; i < option; i++) {
-        if(fgets(buf, 4096, file) == NULL)
+        lines[i] = (char*)malloc(4096 * sizeof(char));
+        if(readLine(fd, lines[i], 4096) == NULL)
             break;
-        lines[i] = (char*)malloc(strlen(buf) * sizeof(char));
-        strcpy(lines[i], buf);
     }
     linecnt = i;
-    fclose(file);
 
     for(i = 0; i < linecnt; i++) {
-        fputs(lines[i], stdout);
+        write(STDOUT_FILENO, lines[i], strlen(lines[i]));
         free(lines[i]);
     }
+    free(lines);
+
+    if(fd != STDIN_FILENO) close(fd);
     
     return 0;
 }
 
 int ext_tail(char *argv1, char *argv2, char *argv3) {
-    FILE *file;
+    int fd;
     char buf[4096];
     char *filename;
     int option = 10;
@@ -389,38 +400,41 @@ int ext_tail(char *argv1, char *argv2, char *argv3) {
     }
 
     if(strlen(filename) == 0)
-        file = stdin;
+        fd = STDIN_FILENO;
     else {
-        if((file = fopen(filename, "r")) == NULL) {
+        if((fd = open(filename, O_RDONLY)) < 0) {
             perror("Error: File doesn't exist");
             exit(1);
         }
     }
 
     lines = (char**)malloc(option * sizeof(char*));
+    for(i = 0; i < option; i++)
+        lines[i] = NULL;
 
     for(last = 0; ; last = (last+1) % option) {
-        if(fgets(buf, 4096, file) == NULL)
+        if(lines[last] == NULL)
+            lines[last] = (char*)malloc(4096 * sizeof(char));
+        if(readLine(fd, lines[last], 4096) == NULL)
             break;
-        if(lines[last] != NULL) free(lines[last]);
-        lines[last] = (char*)malloc(strlen(buf) * sizeof(char));
-        strcpy(lines[last], buf);
     }
-    fclose(file);
 
     for(i = last; i < option; i++) {
         if(lines[i] != NULL) {
-            fputs(lines[i], stdout);
+            write(STDOUT_FILENO, lines[i], strlen(lines[i]));
             free(lines[i]);
         }
     }
 
     for(i = 0; i < last; i++) {
         if(lines[i] != NULL) {
-            fputs(lines[i], stdout);
+            write(STDOUT_FILENO, lines[i], strlen(lines[i]));
             free(lines[i]);
         }
     }
+    free(lines);
+
+    if(fd != STDIN_FILENO) close(fd);
     
     return 0;
 }
