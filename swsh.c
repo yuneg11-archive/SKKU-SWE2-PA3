@@ -28,16 +28,20 @@ int ext_head(char *argv1, char *argv2, char *argv3);
 int ext_tail(char *argv1, char *argv2, char *argv3);
 
 int main() {
+    char cmdline[MAXLINE];
+    int cmdlen;
+
     signal(SIGINT, SIG_IGN);
     signal(SIGTSTP, SIG_IGN);
-    char cmdline[MAXLINE];
 
     while (1) {
 	    printf("> ");                   
 	    fgets(cmdline, MAXLINE, stdin); 
 	    if (feof(stdin))
 	        exit(0);
-
+        cmdlen = strlen(cmdline);
+        if(cmdline[cmdlen-1] == '\n')
+            cmdline[cmdlen-1] = '\0';
 	    eval(cmdline);
     } 
 }
@@ -161,7 +165,7 @@ int parsePipe(char *buf, char **lines, char **pipe_in_file_p, char **pipe_out_fi
         *cur = '\0';
         for(cur++; *cur == ' '; cur++);
         *pipe_in_file_p = cur;
-        for(; (*cur != ' ' && *cur != '\n') && *cur != '\0'; cur++);
+        for(; *cur != ' ' && *cur != '\0'; cur++);
         *cur = '\0';
     } else {
         *pipe_in_file_p = NULL;
@@ -173,14 +177,14 @@ int parsePipe(char *buf, char **lines, char **pipe_in_file_p, char **pipe_out_fi
         *(cur+1) = '\0';
         for(cur+=2; *cur == ' '; cur++);
         *pipe_out_file_p = cur;
-        for(; (*cur != ' ' && *cur != '\n') && *cur != '\0'; cur++);
+        for(; *cur != ' ' && *cur != '\0'; cur++);
         *cur = '\0';
     } else if((cur = strchr(lines[pipe_num], '>')) != NULL) {
         *pipe_out_file_mode_p = 1;
         *cur = '\0';
         for(cur++; *cur == ' '; cur++);
         *pipe_out_file_p = cur;
-        for(; (*cur != ' ' && *cur != '\n') && *cur != '\0'; cur++);
+        for(; *cur != ' ' && *cur != '\0'; cur++);
         *cur = '\0';
     } else {
         *pipe_out_file_p = NULL;
@@ -197,16 +201,16 @@ void parseLine(char *buf, char **argv) {
     for(; *cur != '\0'; cur++) {
         if(*cur == '\"') {
             argv[argc++] = cur+1;
-            for(cur++; *cur != '\"' && *cur != '\n' && *cur != '\0'; cur++);
+            for(cur++; *cur != '\"' && *cur != '\0'; cur++);
         } else if(*cur == '\'') {
             argv[argc++] = cur+1;
-            for(cur++; *cur != '\'' && *cur != '\n' && *cur != '\0'; cur++);
+            for(cur++; *cur != '\'' && *cur != '\0'; cur++);
         } else {
             argv[argc++] = cur;
-            for(; *cur != ' ' && *cur != '\n' && *cur != '\0'; cur++);
+            for(; *cur != ' ' && *cur != '\0'; cur++);
         }
         *cur = '\0';
-        for(; (*cur == ' ' || *cur == '\n') && *cur != '\0'; cur++);
+        for(; *cur == ' ' && *cur != '\0'; cur++);
     }
     argv[argc] = NULL;
 }
