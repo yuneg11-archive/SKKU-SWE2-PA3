@@ -299,9 +299,10 @@ int ext_cat(char *file) {
 }
 
 int ext_head(char *argv1, char *argv2, char *argv3) {
-    char *file;
+    FILE *file;
+    char buf[4096];
+    char *filename;
     int option = 10;
-    int fd;
     char **lines;
     int linecnt;
     int i;
@@ -313,28 +314,27 @@ int ext_head(char *argv1, char *argv2, char *argv3) {
     if(strncmp(argv1, "-n", 2) == 0) {
         if(strlen(argv1) == 2) {
             option = atoi(argv2);
-            file = argv3;
+            filename = argv3;
         } else {
             option = atoi(&argv1[2]);
-            file = argv2;
+            filename = argv2;
         }
     } else if(strncmp(argv2, "-n", 2) == 0) {
         if(strlen(argv2) == 2) {
             option = atoi(argv3);
-            file = argv1;
+            filename = argv1;
         } else {
             option = atoi(&argv2[2]);
-            file = argv1;
+            filename = argv1;
         }
     } else {
-        file = argv1;
+        filename = argv1;
     }
 
-    if(strlen(file) == 0)
-        fd = STDIN_FILENO;
+    if(strlen(filename) == 0)
+        file = stdin;
     else {
-        fd = open(file, O_RDONLY);
-        if(fd < 0) {
+        if((file = fopen(filename, "r")) == NULL) {
             perror("Error: File doesn't exist");
             exit(1);
         }
@@ -343,13 +343,16 @@ int ext_head(char *argv1, char *argv2, char *argv3) {
     lines = (char**)malloc(option * sizeof(char*));
 
     for(i = 0; i < option; i++) {
-        if((lines[i] = readLineAndStore(fd)) == NULL)
+        if(fgets(buf, 4096, file) == NULL)
             break;
+        lines[i] = (char*)malloc(strlen(buf) * sizeof(char));
+        strcpy(lines[i], buf);
     }
     linecnt = i;
+    fclose(file);
 
     for(i = 0; i < linecnt; i++) {
-        puts(lines[i]);
+        fputs(lines[i], stdout);
         free(lines[i]);
     }
     
@@ -357,11 +360,11 @@ int ext_head(char *argv1, char *argv2, char *argv3) {
 }
 
 int ext_tail(char *argv1, char *argv2, char *argv3) {
-    char *file;
+    FILE *file;
+    char buf[4096];
+    char *filename;
     int option = 10;
-    int fd;
     char **lines;
-    char *temp;
     int i;
     int last;
 
@@ -372,28 +375,27 @@ int ext_tail(char *argv1, char *argv2, char *argv3) {
     if(strncmp(argv1, "-n", 2) == 0) {
         if(strlen(argv1) == 2) {
             option = atoi(argv2);
-            file = argv3;
+            filename = argv3;
         } else {
             option = atoi(&argv1[2]);
-            file = argv2;
+            filename = argv2;
         }
     } else if(strncmp(argv2, "-n", 2) == 0) {
         if(strlen(argv2) == 2) {
             option = atoi(argv3);
-            file = argv1;
+            filename = argv1;
         } else {
             option = atoi(&argv2[2]);
-            file = argv1;
+            filename = argv1;
         }
     } else {
-        file = argv1;
+        filename = argv1;
     }
 
-    if(strlen(file) == 0)
-        fd = STDIN_FILENO;
+    if(strlen(filename) == 0)
+        file = stdin;
     else {
-        fd = open(file, O_RDONLY);
-        if(fd < 0) {
+        if((file = fopen(filename, "r")) == NULL) {
             perror("Error: File doesn't exist");
             exit(1);
         }
@@ -402,22 +404,24 @@ int ext_tail(char *argv1, char *argv2, char *argv3) {
     lines = (char**)malloc(option * sizeof(char*));
 
     for(last = 0; ; last = (last+1) % option) {
-        if((temp = readLineAndStore(fd)) == NULL)
+        if(fgets(buf, 4096, file) == NULL)
             break;
         if(lines[last] != NULL) free(lines[last]);
-        lines[last] = temp;
+        lines[last] = (char*)malloc(strlen(buf) * sizeof(char));
+        strcpy(lines[last], buf);
     }
+    fclose(file);
 
     for(i = last; i < option; i++) {
         if(lines[i] != NULL) {
-            puts(lines[i]);
+            fputs(lines[i], stdout);
             free(lines[i]);
         }
     }
 
     for(i = 0; i < last; i++) {
         if(lines[i] != NULL) {
-            puts(lines[i]);
+            fputs(lines[i], stdout);
             free(lines[i]);
         }
     }
