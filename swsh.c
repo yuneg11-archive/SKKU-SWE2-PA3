@@ -352,10 +352,6 @@ int ext_head(char *argv1, char *argv2, char *argv3) {
         lines[i] = (char*)malloc(4096 * sizeof(char));
         if(readLine(fd, lines[i], 4096) == NULL)
             break;
-    }
-    linecnt = i;
-
-    for(i = 0; i < linecnt; i++) {
         write(STDOUT_FILENO, lines[i], strlen(lines[i]));
         free(lines[i]);
     }
