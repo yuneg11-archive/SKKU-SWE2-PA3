@@ -83,6 +83,7 @@ void eval(char *cmdline) {
     int in_file_fd;
     int pipe_fd[MAXPIPE][2];
     int pipe_cur;
+    pid_t pids[MAXPIPE];
 
     pipe_num = parsePipe(cmdline, lines, &pipe_in_file, &pipe_out_file, &pipe_out_file_mode);
     for(pipe_cur = 0; pipe_cur <= pipe_num; pipe_cur++)
@@ -151,13 +152,16 @@ void eval(char *cmdline) {
 
             exit(result);
         } else {
-            wait(NULL);
+            pids[pipe_cur] = pid;
             if(pipe_cur > 0)
                 close(pipe_fd[pipe_cur-1][0]);
             if(pipe_cur < pipe_num)
                 close(pipe_fd[pipe_cur][1]);
         }
     }
+
+    for(pipe_cur = 0; pipe_cur <= pipe_num; pipe_cur++)
+        waitpid(pids[pipe_cur], 0, 0);
 	
     return;
 }
