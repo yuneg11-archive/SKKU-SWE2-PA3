@@ -47,7 +47,6 @@ char *readLine(int fd, char *line, int limit) {
     }
     
     line[cur] = '\0';
-    //fprintf(stderr, "%2d |%s", strlen(line), line);
     return line;
 }
 
@@ -232,6 +231,7 @@ void parseLine(char *buf, char **argv) {
             argv[argc++] = cur;
             for(; *cur != ' ' && *cur != '\0'; cur++);
         }
+        if(*cur == '\0') break;
         *cur = '\0';
         for(; *cur == ' ' && *cur != '\0'; cur++);
     }
