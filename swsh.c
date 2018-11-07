@@ -89,7 +89,7 @@ void eval(char *cmdline) {
         parseLine(lines[pipe_cur], argvs[pipe_cur]);
     
     /*DEBUG*/
-    printf("pipe_num = %d\n", pipe_num);
+    /*printf("pipe_num = %d\n", pipe_num);
     printf("pipe_in_file = \"%s\"\n", pipe_in_file);
     printf("pipe_out_file = \"%s\"\n", pipe_out_file);
     printf("pipe_out_file_mode = %d\n", pipe_out_file_mode);
@@ -99,7 +99,7 @@ void eval(char *cmdline) {
             printf("argv[%d] = %s, ", j, argvs[i][j]);
         }
         printf("\n");
-    }
+    }*/
 
     if(argvs[0][0] == NULL)
         return;
