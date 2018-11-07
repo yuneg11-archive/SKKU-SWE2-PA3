@@ -89,7 +89,7 @@ void eval(char *cmdline) {
         parseLine(lines[pipe_cur], argvs[pipe_cur]);
     
     /*DEBUG*/
-    /*printf("pipe_num = %d\n", pipe_num);
+    printf("pipe_num = %d\n", pipe_num);
     printf("pipe_in_file = \"%s\"\n", pipe_in_file);
     printf("pipe_out_file = \"%s\"\n", pipe_out_file);
     printf("pipe_out_file_mode = %d\n", pipe_out_file_mode);
@@ -99,7 +99,7 @@ void eval(char *cmdline) {
             printf("argv[%d] = %s, ", j, argvs[i][j]);
         }
         printf("\n");
-    }*/
+    }
 
     if(argvs[0][0] == NULL)
         return;
@@ -118,9 +118,13 @@ void eval(char *cmdline) {
             signal(SIGTSTP, SIG_DFL);
 
             if(pipe_cur == 0 && pipe_in_file != NULL) {
-                in_file_fd = open(pipe_in_file, O_RDONLY);
-                dup2(in_file_fd, STDIN_FILENO);
-                close(in_file_fd);
+                if((in_file_fd = open(pipe_in_file, O_RDONLY)) < 0) {
+                    write(STDERR_FILENO, "swsh: No such file\n", 19);
+                    exit(1);
+                } else {
+                    dup2(in_file_fd, STDIN_FILENO);
+                    close(in_file_fd);
+                }
             }
             if(pipe_cur == pipe_num && pipe_out_file != NULL) {
                 if(pipe_out_file_mode == 1)
@@ -192,23 +196,26 @@ int parsePipe(char *buf, char **lines, char **pipe_in_file_p, char **pipe_out_fi
             *cur = '\0';
             for(cur++; *cur == ' ' && *cur != '\0'; cur++);
             *pipe_in_file_p = cur;
-            for(; *cur != ' ' && *cur != '\0'; cur++);
-            *cur = '\0';
+            for(; *cur != ' ' && *cur != '>' && *cur != '|' && *cur != '\0'; cur++);
+            if(*cur == '|' || *cur == '>') cur--;
+            else *cur = '\0';
         } else if(*cur == '>' && *(cur+1) == '>') {
             *cur = '\0';
             *(cur+1) = '\0';
             for(cur += 2; *cur == ' ' && *cur != '\0'; cur++);
             *pipe_out_file_p = cur;
             *pipe_out_file_mode_p = 2;
-            for(; *cur != ' ' && *cur != '\0'; cur++);
-            *cur = '\0';
+            for(; *cur != ' ' && *cur != '<' && *cur != '\0'; cur++);
+            if(*cur == '<') cur--;
+            else *cur = '\0';
         } else if(*cur == '>' && *(cur+1) != '>') {
             *cur = '\0';
             for(cur++; *cur == ' ' && *cur != '\0'; cur++);
             *pipe_out_file_p = cur;
             *pipe_out_file_mode_p = 1;
-            for(; *cur != ' ' && *cur != '\0'; cur++);
-            *cur = '\0';
+            for(; *cur != ' ' && *cur != '<' && *cur != '\0'; cur++);
+            if(*cur == '<') cur--;
+            else *cur = '\0';
         }
     }
 
